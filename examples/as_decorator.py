@@ -9,9 +9,5 @@ def some_function():
     print('Do work')
 
 
-def main():
-    some_function()
-
-
 if __name__ == '__main__':
     some_function()

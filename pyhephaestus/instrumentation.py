@@ -33,7 +33,7 @@ class FuncInstrumentator(metaclass=MetaInstrumentator):
 
 
 class instrumentation_wraps:
-    def __init__(self, on_enter: str | None = None, on_exit: str | None = None):
+    def __init__(self, *, on_enter: str | None = None, on_exit: str | None = None):
         self._on_enter = on_enter
         self._on_exit = on_exit
 
