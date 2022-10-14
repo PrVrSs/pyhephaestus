@@ -1,5 +1,8 @@
+from types import CodeType
+
 from .merger import merge, Location
 from .utils import str_to_code
+from .inject import Code, Instruction
 
 
 class MetaInstrumentator(type):
@@ -32,10 +35,24 @@ class FuncInstrumentator(metaclass=MetaInstrumentator):
     on_exit = None
 
 
+def f(t):
+    match t:
+        case str():
+            raise NotImplemented
+        case CodeType():
+            return Code(t)
+        case list():
+            return Instruction(t)
+        case None:
+            return
+        case _:
+            raise
+
+
 class instrumentation_wraps:
     def __init__(self, *, on_enter: str | None = None, on_exit: str | None = None):
-        self._on_enter = on_enter
-        self._on_exit = on_exit
+        self._on_enter = f(on_enter)
+        self._on_exit = f(on_exit)
 
     def __call__(self, func):
         if not callable(func):
@@ -45,14 +62,14 @@ class instrumentation_wraps:
         if self._on_enter is not None:
             code = merge(
                 original=code,
-                injected=str_to_code(self._on_enter),
+                injected=self._on_enter,
                 location=Location.START,
             )
 
         if self._on_exit is not None:
             code = merge(
                 original=code,
-                injected=str_to_code(self._on_exit),
+                injected=self._on_exit,
                 location=Location.END,
             )
 

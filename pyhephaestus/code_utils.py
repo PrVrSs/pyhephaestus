@@ -1,3 +1,4 @@
+import dis
 from itertools import chain, count
 from functools import reduce
 from typing import Iterator
@@ -39,11 +40,17 @@ def merge_co_name(co_names_a: tuple, co_names_b: tuple) -> tuple:
     return tuple(unique_everseen(chain(co_names_a, co_names_b)))
 
 
-def to_bytes(instructions: list[HephaestusInstruction]) -> bytes:
-    return b''.join([
-        instruction.to_bytes()
-        for instruction in instructions
-    ])
+# def to_bytes(instructions: list[HephaestusInstruction]) -> bytes:
+#     return b''.join([
+#         instruction.to_bytes()
+#         for instruction in instructions
+#     ])
+
+
+def to_bytes(instructions: list[dis.Instruction]):
+    for instr in instructions:
+        arg = instr.arg if instr.arg is not None else 0
+        yield instr.opcode.to_bytes(1, 'big') + arg.to_bytes(1, 'big')
 
 
 def recalculate_offsets(
@@ -57,28 +64,59 @@ def recalculate_offsets(
 
 
 def create_code_object(
-        origin: CodeType,
-        stack_size: int,
-        bytecode: bytes,
-        consts: tuple,
-        names: tuple,
-        lnotab: bytes,
+        co_argcount,
+        co_posonlyargcount,
+        co_kwonlyargcount,
+        co_nlocals,
+        co_stacksize,
+        co_flags,
+        co_code,
+        co_consts,
+        co_names,
+        co_varnames,
+        co_filename,
+        co_name,
+        co_firstlineno,
+        co_lnotab,
+        co_freevars,
+        co_cellvars,
 ) -> CodeType:
+    return CodeType(
+        co_argcount,
+        co_posonlyargcount,
+        co_kwonlyargcount,
+        co_nlocals,
+        co_stacksize,
+        co_flags,
+        co_code,
+        co_consts,
+        co_names,
+        co_varnames,
+        co_filename,
+        co_name,
+        co_firstlineno,
+        co_lnotab,
+        co_freevars,
+        co_cellvars,
+    )
+
+
+def patch_code(origin: CodeType, payload: bytes) -> CodeType:
     return CodeType(
         origin.co_argcount,
         origin.co_posonlyargcount,
         origin.co_kwonlyargcount,
         origin.co_nlocals,
-        stack_size,
+        origin.co_stacksize,
         origin.co_flags,
-        bytecode,
-        consts,
-        names,
+        payload,
+        origin.co_consts,
+        origin.co_names,
         origin.co_varnames,
         origin.co_filename,
         origin.co_name,
         origin.co_firstlineno,
-        lnotab,
+        origin.co_lnotab,
         origin.co_freevars,
         origin.co_cellvars,
     )

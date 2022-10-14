@@ -28,13 +28,13 @@ def merge_instructions(
 ) -> list[HephaestusInstruction]:
     if location is Location.START:
         return [
-            *inserted[:-2],
+            *inserted,
             *origin,
         ]
 
     return [
         *origin[:-2],
-        *inserted[:-2],
+        *inserted,
         *origin[-2:]
     ]
 
@@ -47,15 +47,15 @@ def make_instructions(code: CodeType) -> list[HephaestusInstruction]:
 
 
 class Merger:
-    def __init__(self, origin: CodeType, inject: CodeType, location: Location):
+    def __init__(self, origin: CodeType, inject, location: Location):
         self._co_origin = origin
         self._co_inject = inject
 
         self._consts, self.inject_origin_const_map = merge_co_const(
-            self._co_origin.co_consts, self._co_inject.co_consts)
+            self._co_origin.co_consts, self._co_inject.co_consts(target=self._co_origin.co_name))
 
-        self._origin_instructions = make_instructions(origin)
-        self._inject_instructions = list(self._prepare_injected(make_instructions(inject)))
+        self._origin_instructions = list(self._prepare_origin(make_instructions(origin)))
+        self._inject_instructions = list(self._prepare_injected([HephaestusInstruction(instr) for instr in self._co_inject.instructions(self._co_origin.co_name)], location))
 
         self._merge_instructions = merge_instructions(
             origin=self._origin_instructions,
@@ -63,27 +63,32 @@ class Merger:
             location=location,
         )
 
-        recalculate_offsets(self._merge_instructions)
+        self._merge_instructions = list(recalculate_offsets(self._merge_instructions))
+
+    def _prepare_origin(self, instructions):
+        for instr in instructions:
+            # if instr.opname == 'LOAD_GLOBAL' and instr.argval not in dir(builtins):
+            #     instr = HephaestusInstruction(
+            #         dis.Instruction(
+            #             opname='LOAD_FAST',
+            #             opcode=124,
+            #             arg=0,
+            #             argval=instr.argval,
+            #             argrepr=instr.argrepr,
+            #             offset=instr.offset,
+            #             starts_line=instr.starts_line,
+            #             is_jump_target=instr.is_jump_target,
+            #         )
+            #     )
+
+            yield instr
 
     def _prepare_injected(
             self,
             instructions: list[HephaestusInstruction],
+            location,
     ) -> Iterator[HephaestusInstruction]:
         for instruction in instructions:
-            if instruction.opname == 'LOAD_NAME' and instruction.argrepr in dir(builtins):
-                instruction = HephaestusInstruction(
-                    dis.Instruction(
-                        opname='LOAD_GLOBAL',
-                        opcode=116,
-                        arg=instruction.arg,
-                        argval=instruction.argval,
-                        argrepr=instruction.argrepr,
-                        offset=instruction.offset,
-                        starts_line=instruction.starts_line,
-                        is_jump_target=instruction.is_jump_target
-                    )
-                )
-
             if instruction.opname == 'LOAD_CONST':
                 instruction.arg = self.inject_origin_const_map[instruction.arg]
 
@@ -93,14 +98,30 @@ class Merger:
 
     def merge(self) -> CodeType:
         return create_code_object(
-            origin=self._co_origin,
-            stack_size=stack_size(self._merge_instructions),
-            bytecode=to_bytes(self._merge_instructions),
-            consts=self._consts,
-            names=merge_co_name(self._co_origin.co_names, self._co_inject.co_names),
-            lnotab=calc_lnotab(self._co_origin, self._merge_instructions),
+            co_argcount=merge_argcount(self._co_origin.co_argcount, self._co_inject.co_argcount),
+            co_posonlyargcount=self._co_origin.co_posonlyargcount,
+            co_kwonlyargcount=self._co_origin.co_kwonlyargcount,
+            co_nlocals=self._co_origin.co_nlocals + self._co_inject.co_nlocals,
+            # co_stacksize=stack_size(self._merge_instructions),
+            co_stacksize=2,
+            co_flags=self._co_origin.co_flags,
+            # co_code=to_bytes(self._merge_instructions),
+            co_code=b''.join([instr for instr in to_bytes(self._merge_instructions)]),
+            co_consts=self._consts,
+            co_names=merge_co_name(self._co_origin.co_names, self._co_inject.co_names),
+            co_varnames=self._co_origin.co_varnames + self._co_inject.co_varnames,
+            co_filename=self._co_origin.co_filename,
+            co_name=self._co_origin.co_name,
+            co_firstlineno=self._co_origin.co_firstlineno,
+            co_lnotab=calc_lnotab(self._co_origin, self._merge_instructions),
+            co_freevars=self._co_origin.co_freevars,
+            co_cellvars=self._co_origin.co_cellvars,
         )
 
 
-def merge(original: CodeType, injected: CodeType, location: Location) -> CodeType:
+def merge_argcount(a, b):
+    return a + b
+
+
+def merge(original: CodeType, injected, location: Location) -> CodeType:
     return Merger(original, injected, location).merge()

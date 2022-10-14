@@ -1,11 +1,3 @@
-<h1 align="center">
-  <br>🛠️ PYHephaestus - WIP</br>
-</h1>
-
-
-### Example
-
-```python
 import dis
 from opcode import opmap
 
@@ -33,4 +25,3 @@ def some_function():
 
 if __name__ == '__main__':
     some_function()
-```
