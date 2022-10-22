@@ -3,6 +3,7 @@ from types import CodeType
 from .merger import merge, Location
 from .utils import str_to_code
 from .inject import Code, Instruction
+from .experemental import Assembler
 
 
 class MetaInstrumentator(type):
@@ -41,8 +42,8 @@ def f(t):
             raise NotImplemented
         case CodeType():
             return Code(t)
-        case list():
-            return Instruction(t)
+        case Assembler():
+            return Instruction(t())
         case None:
             return
         case _:
